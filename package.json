@@ -1,0 +1,24 @@
+{
+  "name": "aws2excel",
+  "version": "0.0.1",
+  "description": "[WIP]AWSの構成情報をExcelに書き出すLambdaファンクション",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kongou-ae/aws2excel.git"
+  },
+  "author": "kongou-ae",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kongou-ae/aws2excel/issues"
+  },
+  "homepage": "https://github.com/kongou-ae/aws2excel#readme",
+  "dependencies": {
+    "async": "^1.5.0",
+    "aws-sdk": "^2.2.13",
+    "exceljs": "^0.2.3"
+  }
+}
