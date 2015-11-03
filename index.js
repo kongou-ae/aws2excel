@@ -25,12 +25,14 @@ exports.handler = function(event, context) {
             })
         },
         // 動作確認用
+        /*
         function printInfo (next){
             var util = require('util'); // 
 
             console.log(util.inspect(ec2Array,false,null))
             next()
         },
+        */
         function buildExcel (next) {
             // -----------------------------------------------------------------------------------------
             // EC2(summary)シートを作る
@@ -264,7 +266,7 @@ exports.handler = function(event, context) {
                     //NetworkInterfaces
                     ec2Array[i].EbsOptimized.toString()
                 ]
-                //console.log(valueAry)
+                //console.log(valueAry) // 動作確認用
                 
                 // BlockDeviceMappingsを実際の値に入れ替え。不足分は-で埋める
                 // dev/xvda is vol-6907d396 的なvalueにする
