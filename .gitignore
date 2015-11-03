@@ -1,3 +1,4 @@
 *.xlsx
+!sample/aws_configuration.xlsx
 *.txt
 node_modules
