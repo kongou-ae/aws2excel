@@ -11,13 +11,13 @@ AWSの構成情報をExcelに書き出すLambdaファンクションを作りた
 
 ## EC2
 
-![ec2_summary](https://raw.githubusercontent.com/kongou-ae/aws2excel/develop/sample/ex2_summary.png)
+![ec2_summary](https://raw.githubusercontent.com/kongou-ae/aws2excel/master/sample/ex2_summary.png)
 
-![ec2_detail](https://raw.githubusercontent.com/kongou-ae/aws2excel/develop/sample/ec2_detail.png)
+![ec2_detail](https://raw.githubusercontent.com/kongou-ae/aws2excel/master/sample/ec2_detail.png)
 
 ## SecurityGroup
 
-![securitygrou@](https://raw.githubusercontent.com/kongou-ae/aws2excel/develop/sample/securitygroup.png)
+![securitygrou@](https://raw.githubusercontent.com/kongou-ae/aws2excel/master/sample/securitygroup.png)
 
 
 ## 使い方
