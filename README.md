@@ -7,7 +7,7 @@ AWSの構成情報をExcelに書き出すLambdaファンクションを作りた
 
 ## サンプル
 
-[aws_configuration.xlsx](https://github.com/kongou-ae/aws2excel/blob/master/sample/aws_configuration.xlsx)
+[aws_configuration.xlsx](https://github.com/kongou-ae/aws2excel/raw/master/sample/aws_configuration.xlsx)
 
 ## 使い方
 
