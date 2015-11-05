@@ -3,19 +3,21 @@ exports.handler = function(event, context) {
     var async = require('async'); 
     var AWS = require('aws-sdk');
     var Excel = require("exceljs");
-    
+    var workbook = new Excel.Workbook();
+    var ec2Array = [];
+    var sgArray = []
+
     // この書き方で.aws/credentialsの情報は取れるみたい。
     var ec2 = new AWS.EC2({
         region: 'ap-northeast-1'
     });
- 
-    var ec2Obj = {};
-    var ec2Array = []; 
     
     async.series([
         // sdkを使い、インスタンスの情報を取得する
         // ToDo：エラーハンドリングを書く
         function getEc2Info(next){
+
+            var ec2Obj = {};
             ec2.describeInstances(function(err, result) {
                 for (var k = 0; k < Object.keys(result.Reservations).length; k++) {
                     ec2Obj = result.Reservations[k].Instances[0]
@@ -24,20 +26,31 @@ exports.handler = function(event, context) {
                 next()
             })
         },
+        function getSecurityGroupInfo(next){
+
+            var sgObj = {};
+            ec2.describeSecurityGroups(function(err, result) {
+                for (var k = 0; k < result.SecurityGroups.length; k++) {
+                    sgObj = result.SecurityGroups[k]
+                    sgArray.push(sgObj)
+                }
+                next()
+            })
+        },
         // 動作確認用
         /*
         function printInfo (next){
             var util = require('util'); // 
-
+            console.log(util.inspect(sgArray,false,null))
             console.log(util.inspect(ec2Array,false,null))
             next()
         },
         */
-        function buildExcel (next) {
+        function buildEc2 (next) {
             // -----------------------------------------------------------------------------------------
             // EC2(summary)シートを作る
             // -----------------------------------------------------------------------------------------
-            var workbook = new Excel.Workbook();
+
             var worksheet_ec2sum = workbook.addWorksheet("EC2(summary)");
 
             // 1行目を追加
@@ -321,7 +334,287 @@ exports.handler = function(event, context) {
                     };
                 });                    
             }
+            next()
+        },
+        function buildSg (next) {
+            
+            // PortRangeを元に、APIの戻り値に対応するマネジメントコンソールの見た目を生成する
+            function checkPortRange (from,to) {
+                
+                if (from == -1) {
+                    return 'N/A'
+                }
+                
+                if (from == null){
+                    return 'All'
+                }
+                
+                if (from == to){
+                    return from
+                } else {
+                    return from + ' - ' + to   
+                }
+            }
+            
+            // IpProtocolを元に、APIの戻り値に対応するマネジメントコンソールの見た目を生成する
+            function checkIpProtocol (IpProtocol){
+                // sg-a9822eccで要動作確認。何かが間違っている
+                if (IpProtocol == -1){
+                    return 'All'
+                } else {
+                    return IpProtocol
+                }
+                
+            }
+            
+            // IpProtocolとPortRangeから、Typeフィールドのマネジメントコンソールの見た目を生成する
+            function determineType (IpProtocol,PortRange) {
+                
+                var sample = IpProtocol+':'+PortRange
+                
+                var TypeObj = {
+                    'All:All':'All traffic',
+                    'icmp:N/A':'All ICMP',
+                    'tcp:All':'All TCP',
+                    'udp:All':'All UDP',
+                    'tcp:22':'SSH',
+                    'tcp:23':'telnet',
+                    'tcp:25':'SMTP',
+                    'tcp:42':'nameserver',
+                    'udp:53':'DNS(UDP)',
+                    'tcp:53':'DNS(TCP)',
+                    'tcp:80':'HTTP',
+                    'tcp:110':'POP3',
+                    'tcp:143':'IMAP',
+                    'tcp:389':'LDAP',
+                    'tcp:443':'HTTPS',
+                    'tcp:465':'SMTPS',
+                    'tcp:993':'IMAPS',
+                    'tcp:9955':'POP3S',
+                    'tcp:1433':'MS SQL',
+                    'tcp:3306':'MySQL/Aurora',
+                    'tcp:3389':'RDP',
+                }
+                
+                if (sample in TypeObj){
+                    return TypeObj[sample]
+                }
+                
+                if (/tcp:/.test(sample)) {
+                    return 'Custom TCP Rule'
+                }
+                    
+                if (/udp:/.test(sample)){
+                    return 'Custom UDP Rule'
+                }
 
+                if (/icmp:/.test(sample)){
+                    return 'Custom ICMP Rule'
+                }
+                
+                return sample
+                
+            }
+            
+            // -----------------------------------------------------------------------------------------
+            // SecurityGroupシートを作る
+            // -----------------------------------------------------------------------------------------
+
+            // 枠だけ作る
+            var worksheet_sg = workbook.addWorksheet("SecurityGroup");
+            var rowPos = 0
+            var row = 0
+            var sgSource = ''
+            var sgDestination = ''
+             
+            //var row = worksheet_sg.getRow(3);
+            //row = worksheet_sg.lastRow;
+
+            // A-Eのwidthを15に変更
+            for (var j = 1; j <= 5 ; j++) {
+                worksheet_sg.getColumn(j).width = '17'
+            }
+            
+            var borderStyle = {
+                top: {style:"thin"},
+                left: {style:"thin"},
+                bottom: {style:"thin"},
+                right: {style:"thin"}                   
+            }
+            
+            var fillStyle = {
+                type: "pattern",
+                pattern:"solid",
+                fgColor:{argb:"00191970"}
+            };
+            var fontStyle = {
+                color: { argb: "00FFFFFF" },
+                bold: true
+            };
+
+            // 各セキュリティグループごとに処理を実施
+            for (var j = 0; j < sgArray.length; j++) {
+
+                // まずはルール以外の箇所を描画
+                row = worksheet_sg.getRow(1 + rowPos);
+                row.values = ['GroupId',sgArray[j].GroupId]
+                worksheet_sg.mergeCells("B" +(1 + rowPos) + ":E" + (1 + rowPos));
+                row.eachCell(function(cell,colNumber){
+                    cell.border = borderStyle
+                    // 先頭列の装飾を実施
+                    if (colNumber == 1){
+                        cell.fill = fillStyle
+                        cell.font = fontStyle
+                    } 
+                })
+
+                row = worksheet_sg.getRow(2 + rowPos);
+                row.values = ['GroupName',sgArray[j].GroupName]
+                worksheet_sg.mergeCells("B" +(2 + rowPos) + ":E" + (2 + rowPos));
+                row.eachCell(function(cell,colNumber){
+                    cell.border = borderStyle                        
+                    // 先頭列の装飾を実施
+                    if (colNumber == 1){
+                        cell.fill = fillStyle
+                        cell.font = fontStyle
+                    } 
+                })
+
+                row = worksheet_sg.getRow(3 + rowPos);
+                row.values = ['Description',sgArray[j].Description]
+                worksheet_sg.mergeCells("B" +(3 + rowPos) + ":E" + (3 + rowPos));
+                row.eachCell(function(cell,colNumber){
+                    cell.border = borderStyle
+                    // 先頭列の装飾を実施
+                    if (colNumber == 1){
+                        cell.fill = fillStyle
+                        cell.font = fontStyle
+                    } 
+
+                })
+
+                row = worksheet_sg.getRow(4 + rowPos);
+                if (sgArray[j].VpcId == null ){
+                    row.values = ['VpcId','-']   
+                } else {
+                    row.values = ['VpcId',sgArray[j].VpcId] 
+                }
+                worksheet_sg.mergeCells("B" +(4 + rowPos) + ":E" + (4 + rowPos));
+                row.eachCell(function(cell,colNumber){
+                    cell.border = borderStyle
+                    // 先頭列の装飾を実施
+                    if (colNumber == 1){
+                        cell.fill = fillStyle
+                        cell.font = fontStyle
+                    } 
+                    
+                })
+
+                row = worksheet_sg.getRow(5 + rowPos);
+                row.values = ['Rule','Type','Protocol','Port Range','Src/Dst']
+                row.eachCell(function(cell,colNumber){
+                    // ここの行だけ、全てのセルを装飾
+                    cell.border = borderStyle                        
+                    cell.fill = fillStyle
+                    cell.font = fontStyle
+
+                    if (colNumber != 1){
+                        cell.alignment = { horizontal:'center' }
+                    }                    
+                    
+                })
+
+                // Ingressのルールを描画
+                for (var k = 0; k < sgArray[j].IpPermissions.length; k++) {
+                    row = worksheet_sg.getRow(worksheet_sg.lastRow.number + 1)
+                    
+                    // 送信元がIPアドレスかSGかのチェック
+                    if ( sgArray[j].IpPermissions[k].IpRanges[0] == null ) {
+                        sgSource = sgArray[j].IpPermissions[k].UserIdGroupPairs[0].GroupId
+                    } else {
+                        sgSource = sgArray[j].IpPermissions[k].IpRanges[0].CidrIp
+                    }
+                    
+                    // FromとToからsgPortRangeを生成
+                    var sgPortRange = checkPortRange(sgArray[j].IpPermissions[k].FromPort,sgArray[j].IpPermissions[k].ToPort)
+
+                    // IpProtocolからsgIpProtocolを生成
+                    var sgIpProtocol = checkIpProtocol(sgArray[j].IpPermissions[k].IpProtocol)
+
+                    //  sgIpProtocolとsgPortRangeからsgTypeを生成
+                    var sgType = determineType(sgIpProtocol,sgPortRange)
+
+                    row.values = [
+                        'Ingress', // Rule
+                        sgType, // Type
+                        sgIpProtocol, // Protocol
+                        sgPortRange,
+                        sgSource, // Source 
+                        ]
+                        
+                    row.eachCell(function(cell,colNumber){
+                        cell.border = borderStyle                        
+                        // 先頭列の装飾を実施
+                        if (colNumber == 1){
+                            cell.fill = fillStyle
+                            cell.font = fontStyle
+                        } else {
+                            // それ以外はセンタリング
+                            cell.alignment = { horizontal:'center' }
+                        }
+
+                    })
+
+                }
+                
+                // Egressのルールを描画
+                for (var k = 0; k < sgArray[j].IpPermissionsEgress.length; k++) {
+                    row = worksheet_sg.getRow(worksheet_sg.lastRow.number + 1)
+                    
+                    // 宛先IPアドレスかSGかのチェック
+                    if ( sgArray[j].IpPermissionsEgress[k].IpRanges[0] == null ) {
+                        sgDestination = sgArray[j].IpPermissionsEgress[k].UserIdGroupPairs[0].GroupId
+                    } else {
+                        sgDestination = sgArray[j].IpPermissionsEgress[k].IpRanges[0].CidrIp
+                    }
+
+                    // FromとToからsgPortRangeを生成
+                    var sgPortRange = checkPortRange(sgArray[j].IpPermissionsEgress[k].FromPort,sgArray[j].IpPermissionsEgress[k].ToPort)
+
+                    // IpProtocolからsgIpProtocolを生成
+                    var sgIpProtocol = checkIpProtocol(sgArray[j].IpPermissionsEgress[k].IpProtocol)
+
+                    //  sgIpProtocolとsgPortRangeからsgTypeを生成
+                    var sgType = determineType(sgIpProtocol,sgPortRange)
+
+                    row.values = [
+                        'Egress', // Rule
+                        sgType, // Type
+                        sgIpProtocol , // Protocol
+                        sgPortRange, // Port Range
+                        sgDestination, // Source 
+                        ]
+
+                    row.eachCell(function(cell,colNumber){
+                        cell.border = borderStyle                        
+                        // 先頭列の装飾を実施
+                        if (colNumber == 1){
+                            cell.fill = fillStyle
+                            cell.font = fontStyle
+                        } else {
+                            // それ以外はセンタリング
+                            cell.alignment = { horizontal:'center' }
+                        }
+
+                    })
+                }
+                // 次のセキュリティグループに行くタイミングで、1行開けるために＋１
+                rowPos = worksheet_sg.lastRow.number + 1
+                
+            } 
+            next()
+        },
+        function outputToExcel(next){
             // --------------------------------------------------------------
             // ファイルに書き出し
             // --------------------------------------------------------------
@@ -329,7 +622,7 @@ exports.handler = function(event, context) {
                 .then(function() {
                     console.log('complete')
                     next()
-                });
+                });            
         }
     ])
 }
