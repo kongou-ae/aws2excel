@@ -3,6 +3,7 @@ exports.handler = function(event, context) {
     var async = require('async'); 
     var AWS = require('aws-sdk');
     var Excel = require("exceljs");
+    var ebs = require('./ebs.js')
     var workbook = new Excel.Workbook();
     var ec2Array = [];
     var sgArray = []
@@ -614,6 +615,16 @@ exports.handler = function(event, context) {
             } 
             next()
         },
+        function buildEbs(next){
+            var util = require('util')
+            var hogehoge
+            ec2.describeVolumes(function(err, result){
+                console.log(ebs(result.Volumes,workbook))
+                next()
+            })
+
+            
+        },        
         function outputToExcel(next){
             // --------------------------------------------------------------
             // ファイルに書き出し
