@@ -3,6 +3,7 @@ exports.handler = function(event, context) {
     var async = require('async'); 
     var AWS = require('aws-sdk');
     var Excel = require("exceljs");
+    var ebs = require('./ebs.js')
     var workbook = new Excel.Workbook();
     var ec2Array = [];
     var sgArray = []
@@ -86,13 +87,20 @@ exports.handler = function(event, context) {
 
             for (var i = 0; i < ec2Array.length; i++) {
                 // 2行目以降にインスタンスの情報を記載
+                
+                if (ec2Array[i].PublicIpAddress == null){
+                    var PublicIpAddress = '-'
+                } else {
+                    var PublicIpAddress = ec2Array[i].PublicIpAddress
+                }
+                
                 worksheet_ec2sum.addRow(
                     {   InstanceId: ec2Array[i].InstanceId,
                         ImageId: ec2Array[i].ImageId,
                         state: ec2Array[i].State.Name,
                         InstanceType: ec2Array[i].InstanceType,
                         PrivateIpAddress: ec2Array[i].PrivateIpAddress,
-                        PublicIpAddress: ec2Array[i].PublicIpAddress,
+                        PublicIpAddress: PublicIpAddress,
                         AvailabilityZone: ec2Array[i].Placement.AvailabilityZone
                     });
                 // 2行目以降に罫線を描画
@@ -614,6 +622,16 @@ exports.handler = function(event, context) {
             } 
             next()
         },
+        function buildEbs(next){
+            var util = require('util')
+            var hogehoge
+            ec2.describeVolumes(function(err, result){
+                console.log(ebs(result.Volumes,workbook))
+                next()
+            })
+
+            
+        },        
         function outputToExcel(next){
             // --------------------------------------------------------------
             // ファイルに書き出し
