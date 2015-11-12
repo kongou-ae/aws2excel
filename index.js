@@ -4,12 +4,18 @@ exports.handler = function(event, context) {
     var AWS = require('aws-sdk');
     var Excel = require("exceljs");
     var ebs = require('./ebs.js')
+    var iamUsers = require('./iam_users.js')
     var workbook = new Excel.Workbook();
     var ec2Array = [];
     var sgArray = []
+    var iamUserArray = []
 
     // この書き方で.aws/credentialsの情報は取れるみたい。
     var ec2 = new AWS.EC2({
+        region: 'ap-northeast-1'
+    });
+
+    var iam = new AWS.IAM({
         region: 'ap-northeast-1'
     });
     
@@ -81,6 +87,10 @@ exports.handler = function(event, context) {
                 cell.font = {
                     color: { argb: "00FFFFFF" },
                     bold: true
+                };
+                cell.alignment = {
+                    horizontal: "center" 
+                    
                 };
             });
                 
@@ -623,16 +633,129 @@ exports.handler = function(event, context) {
             next()
         },
         function buildEbs(next){
-            var util = require('util')
-            var hogehoge
+            console.log('EBS is started')
             ec2.describeVolumes(function(err, result){
                 console.log(ebs(result.Volumes,workbook))
                 next()
             })
+        },
+        // ToDo書き直せるか考える。とりあえず動くのをリリース
+        function buildIam(next){
+            console.log('IAM(Users) is started')
+            async.series([
+                function listUsers(next){
+                    // UserNameとCreateDateを生成
+                    iam.listUsers(function(err, listUsers){
+                        for (var k = 0; k < listUsers['Users'].length; k++){
+                            var iamUserObj = {}
+                            iamUserObj.UserName = listUsers['Users'][k].UserName
+                            iamUserObj.CreateDate = listUsers['Users'][k].CreateDate
+                            iamUserObj.LoginProfile = ''
+                            iamUserArray.push(iamUserObj)
+                        }
+                        next()
+                    })
+                },
+                function getLoginProfile(next){
+                    k = 0
+                    async.forEachSeries(iamUserArray,function(data,finish){
+                        iam.getLoginProfile( {UserName:data.UserName} ,function(err,getLoginProfile){
+                            var data = iamUserArray[k]
+                            if (getLoginProfile == null){
+                                data.LoginProfile = 'false'
+                            } else {
+                                data.LoginProfile  = 'true'
+                            }
+                            iamUserArray.splice(k,1,data)
+                            k = k + 1
+                            finish()
+                        })
+                    },function(){
+                        next()
+                    })
+                },
+                function ListAccessKeys(next){
+                    k = 0
+                    async.forEachSeries(iamUserArray,function(data,finish){
+                        iam.listAccessKeys( {UserName:data.UserName} ,function(err,ListAccessKeys){
+                            var data = iamUserArray[k]
+                            switch (ListAccessKeys.AccessKeyMetadata.length){
+                                case 0:
+                                    data.ListAccessKeys1 = '-'
+                                    data.ListAccessKeys2 = '-'
+                                    break;
+                                case 1:
+                                    data.ListAccessKeys1 = ListAccessKeys.AccessKeyMetadata[0].AccessKeyId + '(' + ListAccessKeys.AccessKeyMetadata[0].Status + ')'
+                                    data.ListAccessKeys2 = '-'
+                                    break;
+                                case 2:
+                                    data.ListAccessKeys1 = ListAccessKeys.AccessKeyMetadata[0].AccessKeyId + '(' + ListAccessKeys.AccessKeyMetadata[0].Status + ')'
+                                    data.ListAccessKeys2 = ListAccessKeys.AccessKeyMetadata[1].AccessKeyId + '(' + ListAccessKeys.AccessKeyMetadata[1].Status + ')'
+                                    break;
+                            }
+                            iamUserArray.splice(k,1,data)
+                            k = k + 1
+                            finish()
+                        })
+                    },function(){
+                        next()
+                    })
+                },
+                function listGroupsForUser(next){
+                    k = 0
+                    async.forEachSeries(iamUserArray,function(data,finish){                    
+                        iam.listGroupsForUser( {UserName:data.UserName} ,function(err,listGroupsForUser){
+                            var data = iamUserArray[k]
+                            if ( listGroupsForUser == null)
+                                data.listGroupsForUser == '-'
+                            else {
+                                var tmp = ''
+                                for(var l = 0; l < listGroupsForUser.Groups.length; l++){
+                                    tmp = tmp + listGroupsForUser.Groups[l].GroupName + '\r\n'
+                                }
+                                data.listGroupsForUser = tmp
+                            }
+                            iamUserArray.splice(k,1,data)
+                            k = k + 1
+                            finish()
+                        })
+                    },function(){
+                        next()
+                    })
+                },
+                function listAttachedUserPolicies(next){
+                    k = 0
+                    async.forEachSeries(iamUserArray,function(data,finish){                    
+                        iam.listAttachedUserPolicies( {UserName:data.UserName} ,function(err,listAttachedUserPolicies){
+                            var data = iamUserArray[k]
+                            if ( listAttachedUserPolicies == null){
+                                data.AttachedPolicies == '-'
+                            } else {
+                                var tmp = ''
+                                for(var l = 0; l < listAttachedUserPolicies.AttachedPolicies.length; l++){
+                                    tmp = tmp + listAttachedUserPolicies.AttachedPolicies[l].PolicyName + '\r\n'
+                                }
+                                data.AttachedPolicies = tmp
+                            }
+                            iamUserArray.splice(k,1,data)
+                            k = k + 1
+                            finish()
+                        })
+                    },function(){
+                        next()
+                    })
+                },
+                function buildIamUsers(next){
+                    console.log(iamUsers(iamUserArray,workbook))
+                    next()
+                }
+            ],function(){
+                next()                
+            })
 
-            
-        },        
+        },
         function outputToExcel(next){
+            console.log('building Excel....')
             // --------------------------------------------------------------
             // ファイルに書き出し
             // --------------------------------------------------------------
