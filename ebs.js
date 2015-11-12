@@ -94,7 +94,6 @@ module.exports = function(Volumes,workbook){
                 };
             });                    
         }
-
         return 'EBS is finished'
 }
 
