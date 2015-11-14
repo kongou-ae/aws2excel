@@ -3,17 +3,14 @@
 ## 説明
 
 AWSの構成情報をExcelに書き出すLambdaファンクションを作りたい。
-現時点では、EC2の情報をローカルのxlsxファイルに書き出すだけのスクリプトです。
+現時点では、以下サービスの情報をローカルのxlsxファイルに書き出すだけのスクリプトです。
 
 ## 対応しているサービス
 
 - EC2
 - EBS
 - Security Group
-
-## サンプル
-
-[aws_configuration.xlsx](https://github.com/kongou-ae/aws2excel/raw/master/sample/aws_configuration.xlsx)
+- IAM(User)
 
 ## EC2
 
@@ -23,8 +20,15 @@ AWSの構成情報をExcelに書き出すLambdaファンクションを作りた
 
 ## SecurityGroup
 
-![securitygrou@](https://raw.githubusercontent.com/kongou-ae/aws2excel/master/sample/securitygroup.png)
+![securitygroup](https://raw.githubusercontent.com/kongou-ae/aws2excel/master/sample/securitygroup.png)
 
+## EBS
+
+![EBS](https://raw.githubusercontent.com/kongou-ae/aws2excel/master/sample/ebs.png)
+
+## IAM(Users)
+
+![IAM(Users)](https://raw.githubusercontent.com/kongou-ae/aws2excel/master/sample/iam_users.png)
 
 ## 使い方
 
